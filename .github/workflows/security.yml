@@ -13,3 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No package manager audit configured for this repository."
