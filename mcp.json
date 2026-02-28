@@ -1,0 +1,10 @@
+{
+  "mcp_version": "1.0",
+  "name": "obtrace-sdk-ruby",
+  "description": "MCP context metadata for Obtrace Ruby SDK repository",
+  "resources": [
+    { "id": "readme", "path": "README.md", "description": "Ruby SDK usage" },
+    { "id": "docs-index", "path": "docs/index.md", "description": "Documentation index" },
+    { "id": "client", "path": "lib/obtrace_sdk/client.rb", "description": "SDK client implementation" }
+  ]
+}
