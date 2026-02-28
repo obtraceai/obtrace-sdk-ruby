@@ -5,7 +5,7 @@ require_relative "../lib/obtrace_sdk"
 
 cfg = ObtraceSDK::Config.new(
   api_key: "<API_KEY>",
-  ingest_base_url: "https://injet.obtrace.ai",
+  ingest_base_url: "https://inject.obtrace.ai",
   service_name: "ruby-api"
 )
 
