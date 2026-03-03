@@ -15,3 +15,4 @@ jobs:
           ruby-version: '3.3'
       - run: ruby -c lib/obtrace_sdk.rb
       - run: ruby -c lib/obtrace_sdk/*.rb
+      - run: ruby test/context_test.rb
