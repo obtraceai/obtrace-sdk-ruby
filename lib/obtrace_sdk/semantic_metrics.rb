@@ -22,5 +22,34 @@ module ObtraceSDK
     WEB_VITAL_CLS = "web.vital.cls"
     WEB_VITAL_TTFB = "web.vital.ttfb"
     USER_ACTIONS = "obtrace.sim.web.react.actions"
+
+    ALL = [
+      THROUGHPUT,
+      ERROR_RATE,
+      LATENCY_P95,
+      RUNTIME_CPU_UTILIZATION,
+      RUNTIME_MEMORY_USAGE,
+      RUNTIME_THREAD_COUNT,
+      RUNTIME_GC_PAUSE,
+      RUNTIME_EVENTLOOP_LAG,
+      CLUSTER_CPU_UTILIZATION,
+      CLUSTER_MEMORY_USAGE,
+      CLUSTER_NODE_COUNT,
+      CLUSTER_POD_COUNT,
+      DB_OPERATION_LATENCY,
+      DB_CLIENT_ERRORS,
+      DB_CONNECTIONS_USAGE,
+      MESSAGING_CONSUMER_LAG,
+      WEB_VITAL_LCP,
+      WEB_VITAL_FCP,
+      WEB_VITAL_INP,
+      WEB_VITAL_CLS,
+      WEB_VITAL_TTFB,
+      USER_ACTIONS
+    ].freeze
+
+    def self.semantic_metric?(name)
+      ALL.include?(name)
+    end
   end
 end

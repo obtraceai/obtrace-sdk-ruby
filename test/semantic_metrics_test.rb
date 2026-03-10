@@ -7,5 +7,7 @@ class SemanticMetricsTest < Minitest::Test
     assert_equal "runtime.cpu.utilization", ObtraceSDK::SemanticMetrics::RUNTIME_CPU_UTILIZATION
     assert_equal "db.operation.latency", ObtraceSDK::SemanticMetrics::DB_OPERATION_LATENCY
     assert_equal "web.vital.inp", ObtraceSDK::SemanticMetrics::WEB_VITAL_INP
+    assert_equal true, ObtraceSDK::SemanticMetrics.semantic_metric?(ObtraceSDK::SemanticMetrics::WEB_VITAL_INP)
+    assert_equal false, ObtraceSDK::SemanticMetrics.semantic_metric?("orders.count")
   end
 end

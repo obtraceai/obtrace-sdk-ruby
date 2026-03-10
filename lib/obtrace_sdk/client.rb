@@ -20,6 +20,7 @@ module ObtraceSDK
     end
 
     def metric(name, value, unit = "1", context = nil)
+      warn("[obtrace-sdk-ruby] non-canonical metric name: #{name}") if @cfg.validate_semantic_metrics && @cfg.debug && !SemanticMetrics.semantic_metric?(name)
       enqueue("/otlp/v1/metrics", Otlp.metric_payload(@cfg, name, value, unit, context))
     end
 
