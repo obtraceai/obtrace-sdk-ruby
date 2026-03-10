@@ -9,6 +9,6 @@ cfg = ObtraceSDK::Config.new(
 
 client = ObtraceSDK::Client.new(cfg)
 client.log("info", "ruby sdk initialized")
-client.metric("example.counter", 1)
-client.span("example.work")
+client.metric(ObtraceSDK::SemanticMetrics::RUNTIME_CPU_UTILIZATION, 0.41)
+client.span("checkout.charge", attrs: { "feature.name" => "checkout", "payment.provider" => "stripe" })
 client.flush

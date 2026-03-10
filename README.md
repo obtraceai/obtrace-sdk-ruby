@@ -52,10 +52,19 @@ cfg = ObtraceSDK::Config.new(
 
 client = ObtraceSDK::Client.new(cfg)
 client.log("info", "started")
-client.metric("orders.count", 1)
-client.span("job.process")
+client.metric(ObtraceSDK::SemanticMetrics::RUNTIME_CPU_UTILIZATION, 0.41)
+client.span("checkout.charge", attrs: {
+  "feature.name" => "checkout",
+  "payment.provider" => "stripe"
+})
 client.flush
 ```
+
+## Canonical metrics and custom spans
+
+- Use `ObtraceSDK::SemanticMetrics::*` for globally normalized metric names.
+- Custom spans use `client.span("name", attrs: {...})`.
+- Keep free-form metric names only for application-specific signals outside the shared catalog.
 
 ## Frameworks
 
