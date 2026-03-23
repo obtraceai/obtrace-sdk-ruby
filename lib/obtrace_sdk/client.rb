@@ -13,15 +13,21 @@ module ObtraceSDK
       @cfg = cfg
       @queue = []
       @lock = Mutex.new
+      @http = nil
+      @http_uri = nil
+      @circuit_failures = 0
+      @circuit_open_until = Time.at(0)
+
+      at_exit { shutdown }
     end
 
     def log(level, message, context = nil)
-      enqueue("/otlp/v1/logs", Otlp.logs_payload(@cfg, level, message, context))
+      enqueue("/otlp/v1/logs", Otlp.logs_payload(@cfg, level, truncate(message, 32768), context))
     end
 
     def metric(name, value, unit = "1", context = nil)
       warn("[obtrace-sdk-ruby] non-canonical metric name: #{name}") if @cfg.validate_semantic_metrics && @cfg.debug && !SemanticMetrics.semantic_metric?(name)
-      enqueue("/otlp/v1/metrics", Otlp.metric_payload(@cfg, name, value, unit, context))
+      enqueue("/otlp/v1/metrics", Otlp.metric_payload(@cfg, truncate(name, 1024), value, unit, context))
     end
 
     def span(name, trace_id: nil, span_id: nil, start_unix_nano: nil, end_unix_nano: nil, status_code: nil, status_message: "", attrs: nil)
@@ -29,6 +35,11 @@ module ObtraceSDK
       span_id ||= Context.random_hex(8)
       start_ns = start_unix_nano || Otlp.now_unix_nano
       end_ns = end_unix_nano || Otlp.now_unix_nano
+
+      name = truncate(name, 32768)
+      if attrs
+        attrs = attrs.transform_values { |v| v.is_a?(String) ? truncate(v, 4096) : v }
+      end
 
       enqueue("/otlp/v1/traces", Otlp.span_payload(@cfg, name, trace_id, span_id, start_ns, end_ns, status_code, status_message, attrs))
       { trace_id: trace_id, span_id: span_id }
@@ -41,41 +52,110 @@ module ObtraceSDK
     def flush
       batch = []
       @lock.synchronize do
-        batch = @queue.dup
-        @queue.clear
+        return if Time.now < @circuit_open_until
+        half_open = @circuit_failures >= 5
+        if half_open
+          return if @queue.empty?
+          batch = [@queue.shift]
+        else
+          batch = @queue.dup
+          @queue.clear
+        end
       end
-      batch.each { |item| send_item(item) }
+      batch.each do |item|
+        success = send_item(item)
+        @lock.synchronize do
+          if success
+            if @circuit_failures > 0
+              warn("[obtrace-sdk-ruby] circuit breaker closed") if @cfg.debug
+              @circuit_failures = 0
+              @circuit_open_until = Time.at(0)
+            end
+          else
+            @circuit_failures += 1
+            if @circuit_failures >= 5
+              @circuit_open_until = Time.now + 30
+              warn("[obtrace-sdk-ruby] circuit breaker opened") if @cfg.debug
+            end
+          end
+        end
+      end
     end
 
     def shutdown
       flush
+      @lock.synchronize do
+        if @http
+          @http.finish rescue nil
+          @http = nil
+          @http_uri = nil
+        end
+      end
     end
 
     private
 
+    def truncate(s, max)
+      return s if s.length <= max
+      s[0, max] + "...[truncated]"
+    end
+
     def enqueue(endpoint, payload)
       @lock.synchronize do
-        @queue.shift if @queue.length >= @cfg.max_queue_size
-        @queue << { endpoint: endpoint, payload: payload }
+        if @queue.length >= @cfg.max_queue_size
+          @queue.shift
+          warn("[obtrace-sdk-ruby] queue full, dropping oldest item") if @cfg.debug
+        end
+        @queue << { endpoint: endpoint, payload: payload.dup.freeze }
       end
+    end
+
+    def connection_for(uri)
+      if @http && @http_uri && @http_uri.host == uri.host && @http_uri.port == uri.port
+        begin
+          return @http if @http.started?
+        rescue StandardError
+        end
+      end
+
+      @http.finish rescue nil if @http
+      @http = Net::HTTP.new(uri.host, uri.port)
+      @http.use_ssl = uri.scheme == "https"
+      @http.read_timeout = @cfg.request_timeout_sec
+      @http.start
+      @http_uri = uri
+      @http
     end
 
     def send_item(item)
       uri = URI.parse("#{@cfg.ingest_base_url.to_s.sub(%r{/$}, "")}#{item[:endpoint]}")
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = uri.scheme == "https"
-      http.read_timeout = @cfg.request_timeout_sec
+      http = connection_for(uri)
       req = Net::HTTP::Post.new(uri.request_uri)
       req["Authorization"] = "Bearer #{@cfg.api_key}"
       req["Content-Type"] = "application/json"
       (@cfg.default_headers || {}).each { |k, v| req[k] = v.to_s }
       req.body = JSON.generate(item[:payload])
-      res = http.request(req)
-      if @cfg.debug && res.code.to_i >= 300
-        warn("[obtrace-sdk-ruby] status=#{res.code} endpoint=#{item[:endpoint]} body=#{res.body}")
+
+      retries = 0
+      begin
+        res = http.request(req)
+        if res.code.to_i >= 300
+          warn("[obtrace-sdk-ruby] status=#{res.code} endpoint=#{item[:endpoint]} body=#{res.body}") if @cfg.debug
+          return false
+        end
+        true
+      rescue StandardError => e
+        if retries < 2
+          retries += 1
+          sleep 1
+          @http.finish rescue nil
+          @http = nil
+          http = connection_for(uri)
+          retry
+        end
+        warn("[obtrace-sdk-ruby] send failed endpoint=#{item[:endpoint]} err=#{e.message}") if @cfg.debug
+        false
       end
-    rescue StandardError => e
-      warn("[obtrace-sdk-ruby] send failed endpoint=#{item[:endpoint]} err=#{e.message}") if @cfg.debug
     end
   end
 end
