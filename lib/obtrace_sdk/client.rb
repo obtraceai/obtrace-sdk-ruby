@@ -17,8 +17,11 @@ module ObtraceSDK
       @http_uri = nil
       @circuit_failures = 0
       @circuit_open_until = Time.at(0)
+      @seen_exceptions = {}
+      @seen_lock = Mutex.new
 
-      at_exit { shutdown }
+      install_exception_tracepoint
+      at_exit { capture_fatal; shutdown }
     end
 
     def log(level, message, context = nil)
@@ -83,6 +86,7 @@ module ObtraceSDK
     end
 
     def shutdown
+      @tracepoint&.disable
       flush
       @lock.synchronize do
         if @http
@@ -94,6 +98,45 @@ module ObtraceSDK
     end
 
     private
+
+    def install_exception_tracepoint
+      client = self
+      @tracepoint = TracePoint.new(:raise) do |tp|
+        ex = tp.raised_exception
+        eid = ex.object_id
+        seen = client.instance_variable_get(:@seen_lock).synchronize do
+          cache = client.instance_variable_get(:@seen_exceptions)
+          next true if cache[eid]
+          cache[eid] = true
+          cache.shift if cache.size > 200
+          false
+        end
+        unless seen
+          bt = (ex.backtrace || []).first(10).join("\n")
+          client.log("error", "#{ex.class}: #{ex.message}", {
+            "exception.type" => ex.class.to_s,
+            "exception.message" => ex.message.to_s,
+            "exception.stacktrace" => bt,
+            "code.filepath" => tp.path.to_s,
+            "code.lineno" => tp.lineno.to_s,
+            "auto.source" => "tracepoint"
+          })
+        end
+      end
+      @tracepoint.enable
+    end
+
+    def capture_fatal
+      return unless $!
+      ex = $!
+      bt = (ex.backtrace || []).first(10).join("\n")
+      log("fatal", "#{ex.class}: #{ex.message}", {
+        "exception.type" => ex.class.to_s,
+        "exception.message" => ex.message.to_s,
+        "exception.stacktrace" => bt,
+        "auto.source" => "at_exit"
+      })
+    end
 
     def truncate(s, max)
       return s if s.length <= max
