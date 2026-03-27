@@ -8,10 +8,25 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  publish:
     runs-on: obtrace-runners
     steps:
       - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - name: Set version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          sed -i "s/VERSION = .*/VERSION = \"${VERSION}\"/" lib/obtrace_sdk/version.rb
+      - name: Build gem
+        run: gem build obtrace-sdk-ruby.gemspec
+      - name: Push to RubyGems
+        run: |
+          mkdir -p ~/.gem
+          echo ":rubygems_api_key: ${{ secrets.RUBYGEMS_API_KEY }}" > ~/.gem/credentials
+          chmod 0600 ~/.gem/credentials
+          gem push obtrace-sdk-ruby-*.gem
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
