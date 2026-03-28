@@ -8,11 +8,10 @@ on:
 jobs:
   ci:
     runs-on: obtrace-runners
+    container:
+      image: ruby:3.2-slim
     steps:
       - uses: actions/checkout@v6
-      - name: Install Ruby
-        run: |
-          which ruby || (sudo apt-get update && sudo apt-get install -y ruby) || (apt-get update && apt-get install -y ruby) || true
       - run: ruby -c lib/obtrace_sdk.rb
       - run: ruby -c lib/obtrace_sdk/*.rb
       - run: ruby -Ilib test/semantic_metrics_test.rb
