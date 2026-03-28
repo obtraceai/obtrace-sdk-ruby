@@ -18,6 +18,11 @@ Gem::Specification.new do |spec|
   spec.files = Dir["lib/**/*", "LICENSE", "README.md"]
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "net-http"
-  spec.add_dependency "json"
+  spec.add_dependency "opentelemetry-sdk", "~> 1.3"
+  spec.add_dependency "opentelemetry-api", "~> 1.3"
+  spec.add_dependency "opentelemetry-exporter-otlp", "~> 0.26"
+
+  spec.add_development_dependency "opentelemetry-instrumentation-net_http"
+  spec.add_development_dependency "opentelemetry-instrumentation-rack"
+  spec.add_development_dependency "opentelemetry-instrumentation-rails"
 end

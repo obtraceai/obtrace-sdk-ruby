@@ -3,18 +3,11 @@ require "minitest/autorun"
 require "obtrace_sdk"
 
 class MiddlewareTest < Minitest::Test
-  def setup
-    ObtraceSDK::HttpInstrumentation.reset!
-    ObtraceSDK::LoggerCapture.reset!
-  end
-
   def make_client
     cfg = ObtraceSDK::Config.new(
       api_key: "test-key",
       ingest_base_url: "http://localhost:19999",
-      service_name: "test-svc",
-      auto_instrument_http: false,
-      auto_capture_logs: false
+      service_name: "test-svc"
     )
     ObtraceSDK::Client.new(cfg)
   end

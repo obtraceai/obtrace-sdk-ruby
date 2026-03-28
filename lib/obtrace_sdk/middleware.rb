@@ -3,84 +3,58 @@ module ObtraceSDK
     def initialize(app, client)
       @app = app
       @client = client
+      @tracer = client.tracer
     end
 
     def call(env)
-      trace_id = extract_trace_id(env) || Context.random_hex(16)
-      span_id = Context.random_hex(8)
-      start_ns = Otlp.now_unix_nano
-      start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      span_name = "#{env["REQUEST_METHOD"]} #{env["PATH_INFO"]}"
 
-      status = nil
-      error = nil
+      extracted_context = extract_context(env)
 
-      begin
-        status, headers, body = @app.call(env)
-        [status, headers, body]
-      rescue => e
-        error = e
-        raise
-      ensure
-        end_ns = Otlp.now_unix_nano
-        duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time) * 1000).round(2)
-        status_code = error ? 500 : status.to_i
+      span_attrs = {
+        "http.method" => env["REQUEST_METHOD"].to_s,
+        "http.target" => env["PATH_INFO"].to_s,
+        "http.host" => env["HTTP_HOST"].to_s,
+        "http.scheme" => (env["rack.url_scheme"] || "http").to_s,
+        "http.user_agent" => env["HTTP_USER_AGENT"].to_s,
+        "net.peer.ip" => (env["HTTP_X_FORWARDED_FOR"] || env["REMOTE_ADDR"]).to_s
+      }
 
-        attrs = {
-          "http.method" => env["REQUEST_METHOD"],
-          "http.target" => env["PATH_INFO"],
-          "http.host" => env["HTTP_HOST"].to_s,
-          "http.scheme" => env["rack.url_scheme"].to_s,
-          "http.status_code" => status_code,
-          "http.duration_ms" => duration_ms,
-          "http.user_agent" => env["HTTP_USER_AGENT"].to_s,
-          "net.peer.ip" => (env["HTTP_X_FORWARDED_FOR"] || env["REMOTE_ADDR"]).to_s
-        }
+      if env["QUERY_STRING"] && !env["QUERY_STRING"].empty?
+        span_attrs["http.query"] = env["QUERY_STRING"]
+      end
 
-        if error
-          attrs["error"] = true
-          attrs["error.type"] = error.class.to_s
-          attrs["error.message"] = error.message.to_s
+      OpenTelemetry::Context.with_current(extracted_context) do
+        @tracer.in_span(span_name, attributes: span_attrs, kind: :server) do |s|
+          begin
+            status, headers, body = @app.call(env)
+            s.set_attribute("http.status_code", status.to_i)
+            if status.to_i >= 500
+              s.status = OpenTelemetry::Trace::Status.error("HTTP #{status}")
+            end
+            [status, headers, body]
+          rescue => e
+            s.record_exception(e)
+            s.status = OpenTelemetry::Trace::Status.error(e.message.to_s)
+            s.set_attribute("http.status_code", 500)
+            raise
+          end
         end
-
-        if env["QUERY_STRING"] && !env["QUERY_STRING"].empty?
-          attrs["http.query"] = env["QUERY_STRING"]
-        end
-
-        @client.span(
-          "#{env["REQUEST_METHOD"]} #{env["PATH_INFO"]}",
-          trace_id: trace_id,
-          span_id: span_id,
-          start_unix_nano: start_ns,
-          end_unix_nano: end_ns,
-          status_code: status_code >= 400 ? status_code : nil,
-          status_message: error ? error.message : "",
-          attrs: attrs
-        )
-
-        level = if status_code >= 500
-          "error"
-        elsif status_code >= 400
-          "warn"
-        else
-          "info"
-        end
-
-        @client.log(
-          level,
-          "#{env["REQUEST_METHOD"]} #{env["PATH_INFO"]} #{status_code} #{duration_ms}ms",
-          attrs
-        )
       end
     end
 
     private
 
-    def extract_trace_id(env)
+    def extract_context(env)
       traceparent = env["HTTP_TRACEPARENT"]
-      return nil unless traceparent
-      parts = traceparent.split("-")
-      return nil unless parts.length >= 3
-      parts[1]
+      return OpenTelemetry::Context.current unless traceparent
+
+      OpenTelemetry.propagation.extract(
+        env,
+        getter: OpenTelemetry::Common::Propagation.rack_env_getter
+      )
+    rescue
+      OpenTelemetry::Context.current
     end
   end
 end
