@@ -2,15 +2,24 @@ require_relative "otel_setup"
 
 module ObtraceSDK
   class Client
+    @@initialized = false
+
     attr_reader :tracer, :meter
 
     def initialize(cfg)
+      if @@initialized
+        warn("[obtrace-sdk-ruby] already initialized, skipping duplicate init")
+        return
+      end
+
       raise ArgumentError, "api_key, ingest_base_url and service_name are required" if cfg.api_key.to_s.empty? || cfg.ingest_base_url.to_s.empty? || cfg.service_name.to_s.empty?
 
+      @@initialized = true
       @cfg = cfg
       @tracer_provider = OtelSetup.configure(cfg)
       @tracer = @tracer_provider.tracer("obtrace-sdk-ruby", ObtraceSDK::VERSION)
       @meter = nil
+      @meter_warning_logged = false
 
       begin
         @meter = OpenTelemetry.meter_provider.meter("obtrace-sdk-ruby", ObtraceSDK::VERSION)
@@ -39,7 +48,13 @@ module ObtraceSDK
     def metric(name, value, unit = "1", context = nil)
       warn("[obtrace-sdk-ruby] non-canonical metric name: #{name}") if @cfg.validate_semantic_metrics && @cfg.debug && !SemanticMetrics.semantic_metric?(name)
 
-      return unless @meter
+      unless @meter
+        unless @meter_warning_logged
+          warn("[obtrace-sdk-ruby] meter provider not available, metrics will be dropped")
+          @meter_warning_logged = true
+        end
+        return
+      end
 
       attrs = {}
       context&.each { |k, v| attrs[k.to_s] = v.to_s }
@@ -64,6 +79,8 @@ module ObtraceSDK
     end
 
     def capture_error(exception, context = nil)
+      exception = Exception.new(exception.to_s) unless exception.is_a?(Exception)
+
       attrs = {}
       context&.each { |k, v| attrs[k.to_s] = v.to_s }
 
@@ -72,6 +89,8 @@ module ObtraceSDK
         s.status = OpenTelemetry::Trace::Status.error(exception.message.to_s)
       end
     end
+
+    alias_method :capture_exception, :capture_error
 
     def shutdown
       @tracer_provider.shutdown if @tracer_provider.respond_to?(:shutdown)
