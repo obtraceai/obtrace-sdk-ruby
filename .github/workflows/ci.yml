@@ -12,6 +12,7 @@ jobs:
       image: ruby:3.2-slim
     steps:
       - uses: actions/checkout@v6
+      - run: gem install opentelemetry-sdk opentelemetry-exporter-otlp --no-document
       - run: ruby -c lib/obtrace_sdk.rb
       - run: ruby -c lib/obtrace_sdk/*.rb
       - run: ruby -Ilib test/semantic_metrics_test.rb
