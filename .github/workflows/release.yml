@@ -43,9 +43,6 @@ jobs:
       (needs.auto-tag.result == 'success' && needs.auto-tag.outputs.created == 'true'))
     needs: [auto-tag]
     runs-on: obtrace-runners
-    env:
-      AGENT_TOOLSDIRECTORY: /home/runner/_work/_tool
-      RUNNER_TOOL_CACHE: /home/runner/_work/_tool
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,13 +53,9 @@ jobs:
           TAG="${{ needs.auto-tag.outputs.tag || github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-      - name: Prepare tool cache
-        run: mkdir -p /home/runner/_work/_tool
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-        env:
-          AGENT_TOOLSDIRECTORY: /home/runner/_work/_tool
+      - name: Install Ruby
+        run: |
+          apt-get update && apt-get install -y ruby || sudo apt-get update && sudo apt-get install -y ruby
       - name: Update version file
         run: sed -i "s/VERSION = .*/VERSION = \"${{ steps.version.outputs.version }}\"/" lib/obtrace_sdk/version.rb
       - name: Build gem
