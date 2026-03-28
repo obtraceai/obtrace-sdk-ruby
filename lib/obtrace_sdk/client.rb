@@ -4,6 +4,8 @@ require "uri"
 require "thread"
 require_relative "context"
 require_relative "otlp"
+require_relative "http_instrumentation"
+require_relative "logger_capture"
 
 module ObtraceSDK
   class Client
@@ -21,6 +23,8 @@ module ObtraceSDK
       @seen_lock = Mutex.new
 
       install_exception_tracepoint
+      HttpInstrumentation.install(self) if @cfg.auto_instrument_http
+      LoggerCapture.install(self) if @cfg.auto_capture_logs
       at_exit { capture_fatal; shutdown }
     end
 
