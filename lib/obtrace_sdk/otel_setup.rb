@@ -50,13 +50,17 @@ module ObtraceSDK
         ["OpenTelemetry::Instrumentation::ActiveRecord", "opentelemetry-instrumentation-active_record"]
       ]
 
-      instrumentations.each do |class_name, gem_name|
-        begin
-          require gem_name.gsub("-", "/")
-        rescue LoadError
-          next
+      threads = instrumentations.map do |class_name, gem_name|
+        Thread.new(class_name, gem_name) do |cn, gn|
+          begin
+            require gn.gsub("-", "/")
+          rescue LoadError
+          end
         end
+      end
+      threads.each(&:join)
 
+      instrumentations.each do |class_name, gem_name|
         klass = Object.const_get(class_name) rescue next
         config.use(class_name) if klass
       end
