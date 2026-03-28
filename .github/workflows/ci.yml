@@ -10,8 +10,11 @@ jobs:
     runs-on: obtrace-runners
     env:
       AGENT_TOOLSDIRECTORY: /home/runner/_work/_tool
+      RUNNER_TOOL_CACHE: /home/runner/_work/_tool
     steps:
       - uses: actions/checkout@v6
+      - name: Prepare tool cache
+        run: mkdir -p /home/runner/_work/_tool
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
