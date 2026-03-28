@@ -12,8 +12,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install Ruby
         run: |
-          sudo apt-get update && sudo apt-get install -y ruby ruby-bundler || apt-get update && apt-get install -y ruby ruby-bundler
-      - run: gem install opentelemetry-sdk opentelemetry-api opentelemetry-exporter-otlp || true
+          which ruby || (sudo apt-get update && sudo apt-get install -y ruby) || (apt-get update && apt-get install -y ruby) || true
       - run: ruby -c lib/obtrace_sdk.rb
       - run: ruby -c lib/obtrace_sdk/*.rb
       - run: ruby -Ilib test/semantic_metrics_test.rb
