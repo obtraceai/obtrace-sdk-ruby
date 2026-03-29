@@ -40,7 +40,7 @@ module ObtraceSDK
       uri = URI("#{base}/v1/init")
       payload = JSON.generate({
         sdk: "obtrace-sdk-ruby",
-        sdk_version: "1.2.0",
+        sdk_version: "1.0.0",
         service_name: @cfg.service_name,
         service_version: @cfg.service_version.to_s,
         runtime: "ruby",

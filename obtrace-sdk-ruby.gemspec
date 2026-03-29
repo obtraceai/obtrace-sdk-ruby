@@ -1,7 +1,7 @@
 require_relative "lib/obtrace_sdk/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "obtrace-sdk-ruby"
+  spec.name          = "obtrace"
   spec.version       = ObtraceSDK::VERSION
   spec.authors       = ["Obtrace"]
   spec.email         = ["dev@obtrace.ai"]
