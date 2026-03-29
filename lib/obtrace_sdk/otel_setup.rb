@@ -35,6 +35,8 @@ module ObtraceSDK
         auto_detect_instrumentations(c)
       end
 
+      OpenTelemetry.propagation = OpenTelemetry::Trace::Propagation::TraceContext.text_map_propagator
+
       OpenTelemetry.tracer_provider
     end
 
