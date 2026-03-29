@@ -1,10 +1,13 @@
+require "net/http"
+require "json"
+require "uri"
 require_relative "otel_setup"
 
 module ObtraceSDK
   class Client
     @@initialized = false
 
-    attr_reader :tracer, :meter
+    attr_reader :tracer, :meter, :handshake_ok
 
     def initialize(cfg)
       if @@initialized
@@ -16,6 +19,7 @@ module ObtraceSDK
 
       @@initialized = true
       @cfg = cfg
+      @handshake_ok = false
       @tracer_provider = OtelSetup.configure(cfg)
       @tracer = @tracer_provider.tracer("obtrace-sdk-ruby", ObtraceSDK::VERSION)
       @meter = nil
@@ -26,7 +30,39 @@ module ObtraceSDK
       rescue => _e
       end
 
+      Thread.new { perform_handshake }
       at_exit { shutdown }
+    end
+
+    private def perform_handshake
+      base = @cfg.ingest_base_url.to_s.chomp("/")
+      return if base.empty?
+      uri = URI("#{base}/v1/init")
+      payload = JSON.generate({
+        sdk: "obtrace-sdk-ruby",
+        sdk_version: "1.0.0",
+        service_name: @cfg.service_name,
+        service_version: @cfg.service_version.to_s,
+        runtime: "ruby",
+        runtime_version: RUBY_VERSION,
+      })
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = uri.scheme == "https"
+      http.open_timeout = 5
+      http.read_timeout = 5
+      req = Net::HTTP::Post.new(uri)
+      req["Content-Type"] = "application/json"
+      req["Authorization"] = "Bearer #{@cfg.api_key}"
+      req.body = payload
+      resp = http.request(req)
+      if resp.code.to_i == 200
+        @handshake_ok = true
+        warn("[obtrace-sdk-ruby] init handshake OK") if @cfg.debug
+      elsif @cfg.debug
+        warn("[obtrace-sdk-ruby] init handshake failed: #{resp.code}")
+      end
+    rescue => e
+      warn("[obtrace-sdk-ruby] init handshake error: #{e.message}") if @cfg.debug
     end
 
     def log(level, message, context = nil)
