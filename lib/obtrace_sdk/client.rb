@@ -15,7 +15,7 @@ module ObtraceSDK
         return
       end
 
-      raise ArgumentError, "api_key, ingest_base_url and service_name are required" if cfg.api_key.to_s.empty? || cfg.ingest_base_url.to_s.empty? || cfg.service_name.to_s.empty?
+      raise ArgumentError, "api_key and service_name are required" if cfg.api_key.to_s.empty? || cfg.service_name.to_s.empty?
 
       @@initialized = true
       @cfg = cfg

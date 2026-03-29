@@ -4,21 +4,22 @@ module ObtraceSDK
   class Railtie < ::Rails::Railtie
     config.after_initialize do |app|
       api_key = Railtie.credentials_fetch("obtrace_api_key") || ENV["OBTRACE_API_KEY"]
-      ingest_url = Railtie.credentials_fetch("obtrace_ingest_url") || ENV["OBTRACE_INGEST_BASE_URL"] || "https://inject.obtrace.ai"
+      ingest_url = Railtie.credentials_fetch("obtrace_ingest_url") || ENV["OBTRACE_INGEST_BASE_URL"]
       service_name = Railtie.credentials_fetch("obtrace_service_name") || ENV["OBTRACE_SERVICE_NAME"] || ::Rails.application.class.module_parent_name.underscore rescue "rails-app"
 
       next unless api_key
 
-      cfg = ObtraceSDK::Config.new(
+      opts = {
         api_key: api_key,
-        ingest_base_url: ingest_url,
         service_name: service_name,
         env: ::Rails.env.to_s,
         tenant_id: Railtie.credentials_fetch("obtrace_tenant_id") || ENV["OBTRACE_TENANT_ID"],
         project_id: Railtie.credentials_fetch("obtrace_project_id") || ENV["OBTRACE_PROJECT_ID"],
         app_id: Railtie.credentials_fetch("obtrace_app_id") || ENV["OBTRACE_APP_ID"],
         debug: ENV["OBTRACE_DEBUG"] == "true"
-      )
+      }
+      opts[:ingest_base_url] = ingest_url if ingest_url
+      cfg = ObtraceSDK::Config.new(**opts)
 
       client = ObtraceSDK::Client.new(cfg)
       ObtraceSDK.instance_variable_set(:@rails_client, client)

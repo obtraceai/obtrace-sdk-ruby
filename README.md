@@ -29,8 +29,10 @@ require_relative "lib/obtrace_sdk"
 
 Required:
 - `api_key`
-- `ingest_base_url`
 - `service_name`
+
+Optional (defaults to `https://ingest.obtrace.ai`):
+- `ingest_base_url`
 
 Optional (auto-resolved from API key on the server side):
 - `tenant_id`
@@ -43,14 +45,13 @@ Optional (auto-resolved from API key on the server side):
 
 ### Simplified setup
 
-The API key resolves `tenant_id`, `project_id`, `app_id`, and `env` automatically on the server side, so only three fields are needed:
+The API key resolves `tenant_id`, `project_id`, `app_id`, and `env` automatically on the server side, so only two fields are needed:
 
 ```ruby
 require "obtrace_sdk"
 
 cfg = ObtraceSDK::Config.new(
   api_key: "obt_live_...",
-  ingest_base_url: "https://ingest.obtrace.io",
   service_name: "my-service"
 )
 
@@ -66,7 +67,6 @@ require_relative "lib/obtrace_sdk"
 
 cfg = ObtraceSDK::Config.new(
   api_key: "<API_KEY>",
-  ingest_base_url: "https://inject.obtrace.ai",
   service_name: "ruby-api"
 )
 

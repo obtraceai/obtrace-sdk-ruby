@@ -6,18 +6,16 @@ class ConfigTest < Minitest::Test
   def test_required_fields
     cfg = ObtraceSDK::Config.new(
       api_key: "k",
-      ingest_base_url: "http://localhost",
       service_name: "svc"
     )
     assert_equal "k", cfg.api_key
-    assert_equal "http://localhost", cfg.ingest_base_url
+    assert_equal "https://ingest.obtrace.ai", cfg.ingest_base_url
     assert_equal "svc", cfg.service_name
   end
 
   def test_defaults
     cfg = ObtraceSDK::Config.new(
       api_key: "k",
-      ingest_base_url: "http://localhost",
       service_name: "svc"
     )
     assert_equal "dev", cfg.env
@@ -30,7 +28,6 @@ class ConfigTest < Minitest::Test
   def test_optional_fields
     cfg = ObtraceSDK::Config.new(
       api_key: "k",
-      ingest_base_url: "http://localhost",
       service_name: "svc",
       tenant_id: "t1",
       project_id: "p1",
